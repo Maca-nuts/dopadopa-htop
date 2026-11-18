@@ -1,29 +1,35 @@
 # dopadopa-htop
 
-A colorful, decorated terminal system monitor inspired by `htop`. It displays CPU and memory usage, history sparklines, a sortable-by-CPU process list, and NVIDIA GPU core/VRAM telemetry when `nvidia-smi` is available.
+`htop` に着想を得た、カラフルなターミナル用システムモニターです。CPU とメモリの使用率、対応センサーから取得できる CPU 温度、使用率の履歴、CPU 使用率順のプロセス一覧を表示します。`nvidia-smi` が利用できる場合は、NVIDIA GPU の使用率、VRAM 使用量、温度も表示します。
 
-## Run
+## インストールと実行
 
-Install Rust, then install the `dtop` command:
+Rust をインストールした後、次のコマンドで `dtop` をインストールします。
 
 ```sh
 cargo install --path .
 ```
 
-Launch it from any terminal with:
+ターミナルで次のコマンドを実行すると起動します。
 
 ```sh
 dtop
 ```
 
-For development, `cargo run --release --bin dtop` runs the same executable without installing it.
+開発時は、インストールせずに `cargo run --release --bin dtop` で実行できます。
 
-Keys: `q`/`Esc` quit, `r` refresh immediately, and `↑`/`↓` (or `j`/`k`) select a process.
+## 操作方法
 
-GPU data comes from:
+- `q` / `Esc`：終了
+- `r`：すぐに更新
+- `↑` / `↓` または `j` / `k`：プロセスを選択
+
+## GPU 情報
+
+GPU の情報は、次のコマンドで取得します。
 
 ```sh
-nvidia-smi --query-gpu=name,utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits
+nvidia-smi --query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu --format=csv,noheader,nounits
 ```
 
-If NVIDIA drivers or `nvidia-smi` are unavailable, the rest of the monitor continues to work and the GPU panel reports that telemetry is unavailable.
+NVIDIA ドライバーまたは `nvidia-smi` を利用できない場合も、それ以外の情報は表示されます。GPU パネルには情報を取得できない旨が表示されます。

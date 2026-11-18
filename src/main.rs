@@ -19,7 +19,7 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Sparkline, Table, TableState},
     Frame, Terminal,
 };
-use sysinfo::{Pid, ProcessesToUpdate, System};
+use sysinfo::{Components, Pid, ProcessesToUpdate, System};
 
 const REFRESH_RATE: Duration = Duration::from_millis(1000);
 
@@ -27,6 +27,7 @@ const REFRESH_RATE: Duration = Duration::from_millis(1000);
 struct GpuStats {
     name: String,
     core_percent: f64,
+    temperature: Option<f64>,
     memory_used: u64,
     memory_total: u64,
 }
@@ -51,6 +52,7 @@ struct ProcessRow {
 
 struct App {
     system: System,
+    components: Components,
     processes: Vec<ProcessRow>,
     gpus: Vec<GpuStats>,
     cpu_history: Vec<u64>,
@@ -67,6 +69,7 @@ impl App {
         system.refresh_all();
         let mut app = Self {
             system,
+            components: Components::new_with_refreshed_list(),
             processes: Vec::new(),
             gpus: Vec::new(),
             cpu_history: Vec::new(),
@@ -81,6 +84,7 @@ impl App {
     }
 
     fn refresh(&mut self) {
+        self.components.refresh(true);
         self.system.refresh_cpu_usage();
         self.system.refresh_memory();
         self.system.refresh_processes(ProcessesToUpdate::All, true);
@@ -141,7 +145,7 @@ fn push_history(history: &mut Vec<u64>, value: u64) {
 fn read_gpus() -> Vec<GpuStats> {
     let output = Command::new("nvidia-smi")
         .args([
-            "--query-gpu=name,utilization.gpu,memory.used,memory.total",
+            "--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu",
             "--format=csv,noheader,nounits",
         ])
         .output();
@@ -160,6 +164,7 @@ fn read_gpus() -> Vec<GpuStats> {
                 core_percent: fields.next()?.parse().ok()?,
                 memory_used: fields.next()?.parse().ok()?,
                 memory_total: fields.next()?.parse().ok()?,
+                temperature: fields.next().and_then(|value| value.parse().ok()),
             })
         })
         .collect()
@@ -243,10 +248,25 @@ fn draw(frame: &mut Frame, app: &mut App) {
     } else {
         app.system.used_memory() as f64 / app.system.total_memory() as f64 * 100.0
     };
-    frame.render_widget(
-        rainbow_gauge(&format!("{cpu:>5.1}%"), cpu / 100.0, " CPU ✹"),
-        top[0],
-    );
+    let temperature = app
+        .components
+        .iter()
+        .filter(|component| {
+            let label = component.label().to_ascii_lowercase();
+            label.contains("cpu")
+                || label.contains("package id")
+                || label == "tctl"
+                || label == "tdie"
+                || label.starts_with("core ")
+        })
+        .filter_map(|component| component.temperature())
+        .filter(|value| value.is_finite())
+        .reduce(f32::max);
+    let cpu_label = match temperature {
+        Some(temp) => format!("{cpu:>5.1}%  {temp:.1}°C"),
+        None => format!("{cpu:>5.1}%  temp N/A"),
+    };
+    frame.render_widget(rainbow_gauge(&cpu_label, cpu / 100.0, " CPU ✹"), top[0]);
     frame.render_widget(
         rainbow_gauge(&format!("{mem:>5.1}%"), mem / 100.0, " MEMORY ✹"),
         top[1],
@@ -332,8 +352,11 @@ fn draw(frame: &mut Frame, app: &mut App) {
                     ),
                     Span::styled(
                         format!(
-                            " CORE {:>5.1}%  VRAM {:>6} / {:<6} MiB ({:>5.1}%)",
+                            " CORE {:>5.1}%  TEMP {}  VRAM {:>6} / {:<6} MiB ({:>5.1}%)",
                             gpu.core_percent,
+                            gpu.temperature
+                                .map(|temp| format!("{temp:.0}°C"))
+                                .unwrap_or_else(|| "N/A".to_string()),
                             gpu.memory_used,
                             gpu.memory_total,
                             gpu.memory_percent()
