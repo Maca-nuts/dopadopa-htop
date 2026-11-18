@@ -204,6 +204,30 @@ fn rainbow_gauge<'a>(label: &'a str, ratio: f64, title: &'a str) -> Gauge<'a> {
 }
 
 fn draw(frame: &mut Frame, app: &mut App) {
+    // Keep the rainbow dark enough for the existing colorful text to remain legible.
+    let rainbow = [
+        (75u8, 20u8, 35u8),
+        (75, 40, 15),
+        (65, 60, 15),
+        (20, 65, 35),
+        (15, 45, 75),
+        (45, 25, 75),
+        (75, 20, 55),
+    ];
+    let area = frame.area();
+    for x in 0..area.width {
+        let position =
+            x as f64 * (rainbow.len() - 1) as f64 / area.width.saturating_sub(1).max(1) as f64;
+        let index = (position as usize).min(rainbow.len() - 2);
+        let blend = position - index as f64;
+        let (r1, g1, b1) = rainbow[index];
+        let (r2, g2, b2) = rainbow[index + 1];
+        let mix = |a: u8, b: u8| (a as f64 + (b as f64 - a as f64) * blend) as u8;
+        let color = Color::Rgb(mix(r1, r2), mix(g1, g2), mix(b1, b2));
+        for y in area.y..area.bottom() {
+            frame.buffer_mut()[(area.x + x, y)].set_bg(color);
+        }
+    }
     let outer = Block::default()
         .title(Line::from(vec![
             Span::styled(" ✦ ", Style::default().fg(Color::Yellow)),
