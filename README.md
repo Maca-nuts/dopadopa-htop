@@ -4,11 +4,19 @@ A colorful, decorated terminal system monitor inspired by `htop`. It displays CP
 
 ## Run
 
-Install Rust, then:
+Install Rust, then install the `dtop` command:
 
 ```sh
-cargo run --release
+cargo install --path .
 ```
+
+Launch it from any terminal with:
+
+```sh
+dtop
+```
+
+For development, `cargo run --release --bin dtop` runs the same executable without installing it.
 
 Keys: `q`/`Esc` quit, `r` refresh immediately, and `↑`/`↓` (or `j`/`k`) select a process.
 
