@@ -170,49 +170,40 @@ fn read_gpus() -> Vec<GpuStats> {
         .collect()
 }
 
-fn gradient(index: usize) -> Color {
-    [
-        Color::Rgb(255, 75, 120),
-        Color::Rgb(255, 180, 50),
-        Color::Rgb(100, 220, 100),
-        Color::Rgb(80, 190, 255),
-        Color::Rgb(170, 100, 255),
-    ][index % 5]
-}
-
-fn rainbow_gauge<'a>(label: &'a str, ratio: f64, title: &'a str) -> Gauge<'a> {
+fn rainbow_gauge<'a>(label: &'a str, ratio: f64, title: &'a str, color: Color) -> Gauge<'a> {
     Gauge::default()
         .block(
             Block::default()
                 .title(Span::styled(
                     title,
                     Style::default()
-                        .fg(Color::Magenta)
+                        .fg(Color::Black)
                         .add_modifier(Modifier::BOLD),
                 ))
                 .borders(Borders::ALL)
                 .border_set(symbols::border::ROUNDED)
-                .border_style(Style::default().fg(Color::Cyan)),
+                .border_style(Style::default().fg(Color::Black)),
         )
         .gauge_style(
             Style::default()
-                .fg(gradient((ratio * 10.0) as usize))
-                .bg(Color::Rgb(35, 35, 52)),
+                .fg(color)
+                .bg(Color::Rgb(20, 22, 35))
+                .add_modifier(Modifier::BOLD),
         )
         .label(label.to_string())
         .ratio(ratio.clamp(0.0, 1.0))
 }
 
 fn draw(frame: &mut Frame, app: &mut App) {
-    // Keep the rainbow dark enough for the existing colorful text to remain legible.
+    // Saturated rainbow colors keep the background lively behind dark text.
     let rainbow = [
-        (75u8, 20u8, 35u8),
-        (75, 40, 15),
-        (65, 60, 15),
-        (20, 65, 35),
-        (15, 45, 75),
-        (45, 25, 75),
-        (75, 20, 55),
+        (255u8, 75u8, 115u8),
+        (255, 145, 35),
+        (255, 225, 35),
+        (100, 225, 75),
+        (35, 205, 235),
+        (155, 135, 255),
+        (255, 95, 200),
     ];
     let area = frame.area();
     for x in 0..area.width {
@@ -225,24 +216,26 @@ fn draw(frame: &mut Frame, app: &mut App) {
         let mix = |a: u8, b: u8| (a as f64 + (b as f64 - a as f64) * blend) as u8;
         let color = Color::Rgb(mix(r1, r2), mix(g1, g2), mix(b1, b2));
         for y in area.y..area.bottom() {
-            frame.buffer_mut()[(area.x + x, y)].set_bg(color);
+            frame.buffer_mut()[(area.x + x, y)]
+                .set_bg(color)
+                .set_fg(Color::Black);
         }
     }
     let outer = Block::default()
         .title(Line::from(vec![
-            Span::styled(" ✦ ", Style::default().fg(Color::Yellow)),
+            Span::styled("", Style::default().fg(Color::Black)),
             Span::styled(
                 "DOPADOPA",
                 Style::default()
-                    .fg(Color::Magenta)
+                    .fg(Color::Black)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" • system monitor ", Style::default().fg(Color::Cyan)),
-            Span::styled("✦ ", Style::default().fg(Color::Yellow)),
+            Span::styled(" • system monitor ", Style::default().fg(Color::Black)),
+            Span::styled("", Style::default().fg(Color::Black)),
         ]))
         .borders(Borders::ALL)
         .border_set(symbols::border::DOUBLE)
-        .border_style(Style::default().fg(Color::Magenta));
+        .border_style(Style::default().fg(Color::Black));
     let area = frame.area();
     frame.render_widget(outer, area);
     let inner = Rect {
@@ -255,7 +248,7 @@ fn draw(frame: &mut Frame, app: &mut App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(5),
-            Constraint::Length(8),
+            Constraint::Length(5),
             Constraint::Min(5),
             Constraint::Length(4),
             Constraint::Length(1),
@@ -290,9 +283,12 @@ fn draw(frame: &mut Frame, app: &mut App) {
         Some(temp) => format!("{cpu:>5.1}%  {temp:.1}°C"),
         None => format!("{cpu:>5.1}%  temp N/A"),
     };
-    frame.render_widget(rainbow_gauge(&cpu_label, cpu / 100.0, " CPU ✹"), top[0]);
     frame.render_widget(
-        rainbow_gauge(&format!("{mem:>5.1}%"), mem / 100.0, " MEMORY ✹"),
+        rainbow_gauge(&cpu_label, cpu / 100.0, " CPU" , Color::Rgb(90, 225, 255)),
+        top[0],
+    );
+    frame.render_widget(
+        rainbow_gauge(&format!("{mem:>5.1}%"), mem / 100.0, " MEMORY ", Color::Rgb(255, 230, 80)),
         top[1],
     );
 
@@ -304,24 +300,26 @@ fn draw(frame: &mut Frame, app: &mut App) {
         Sparkline::default()
             .block(
                 Block::default()
-                    .title(" CPU history ")
+                    .title(Span::styled(" CPU history ", Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)))
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Blue)),
+                    .border_style(Style::default().fg(Color::Black)),
             )
             .data(&app.cpu_history)
-            .style(Style::default().fg(Color::Yellow)),
+            .max(100)
+            .style(Style::default().fg(Color::Rgb(0, 35, 105))),
         charts[0],
     );
     frame.render_widget(
         Sparkline::default()
             .block(
                 Block::default()
-                    .title(" Memory history ")
+                    .title(Span::styled(" Memory history ", Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)))
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Green)),
+                    .border_style(Style::default().fg(Color::Black)),
             )
             .data(&app.memory_history)
-            .style(Style::default().fg(Color::LightGreen)),
+            .max(100)
+            .style(Style::default().fg(Color::Rgb(0, 70, 35))),
         charts[1],
     );
 
@@ -337,7 +335,7 @@ fn draw(frame: &mut Frame, app: &mut App) {
         .title(" processes ")
         .borders(Borders::ALL)
         .border_set(symbols::border::ROUNDED)
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_style(Style::default().fg(Color::Black));
     let table = Table::new(
         proc_rows,
         [
@@ -350,7 +348,7 @@ fn draw(frame: &mut Frame, app: &mut App) {
     .header(
         Row::new(vec!["PID", "COMMAND", "CPU", "MEMORY"]).style(
             Style::default()
-                .fg(Color::Yellow)
+                .fg(Color::Black)
                 .add_modifier(Modifier::BOLD),
         ),
     )
@@ -361,14 +359,14 @@ fn draw(frame: &mut Frame, app: &mut App) {
     let gpu_text = if app.gpus.is_empty() {
         vec![Line::from(Span::styled(
             " nvidia-smi unavailable — GPU metrics hidden",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Black),
         ))]
     } else {
         app.gpus
             .iter()
             .enumerate()
             .flat_map(|(index, gpu)| {
-                let color = gradient(index);
+                let color = Color::Black;
                 [Line::from(vec![
                     Span::styled(
                         format!(" GPU{} {:<24}", index, gpu.name),
@@ -385,7 +383,7 @@ fn draw(frame: &mut Frame, app: &mut App) {
                             gpu.memory_total,
                             gpu.memory_percent()
                         ),
-                        Style::default().fg(Color::White),
+                        Style::default().fg(Color::Black),
                     ),
                 ])]
             })
@@ -396,12 +394,12 @@ fn draw(frame: &mut Frame, app: &mut App) {
             .title(" NVIDIA GPU telemetry ")
             .borders(Borders::ALL)
             .border_set(symbols::border::ROUNDED)
-            .border_style(Style::default().fg(Color::Green)),
+            .border_style(Style::default().fg(Color::Black)),
     );
     frame.render_widget(gpu, layout[3]);
     frame.render_widget(
         Paragraph::new(" q quit  r refresh  ↑↓/jk select ")
-            .style(Style::default().fg(Color::DarkGray)),
+            .style(Style::default().fg(Color::Black)),
         layout[4],
     );
 }
